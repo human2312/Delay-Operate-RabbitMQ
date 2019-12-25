@@ -137,7 +137,13 @@ class MQueueService
         $this->channel->basic_consume($delay_queue, '', false, false, false, false, $callback);
 
         while (count($this->channel->callbacks)) {
-            $this->channel->wait();
+            try{
+                $this->channel->wait(null,false,0.1);
+            } catch (Exception $e) {
+                //超时接收无数据直接
+                $this->close();
+                return;
+            }
             if ($this->receive != "") break; //获取到一条message需要重新发起消费队列
         }
         $exp = $this->receive["exp"];
@@ -151,6 +157,8 @@ class MQueueService
             $this->channel->queue_delete($cache_queue . $exp, false, true);
         } catch (Exception $e) {
             //队列为非空，即将抛出处理异常
+            $this->close();
+            return;
         }
         $this->close();
         return $this->receive;
